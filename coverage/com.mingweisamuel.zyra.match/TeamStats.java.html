@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TeamStats.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">zyra</a> &gt; <a href="index.source.html" class="el_package">com.mingweisamuel.zyra.match</a> &gt; <span class="el_source">TeamStats.java</span></div><h1>TeamStats.java</h1><pre class="source lang-java linenums">package com.mingweisamuel.zyra.match;
+
+import com.google.common.base.Objects;
+import java.io.Serializable;
+import java.lang.Object;
+import java.lang.Override;
+import java.lang.String;
+import java.util.List;
+
+/**
+ * TeamStats.&lt;br&gt;&lt;br&gt;
+ *
+ * This class was automatically generated from the &lt;a href=&quot;https://developer.riotgames.com/api-methods/#match-v3/GET_getMatch&quot;&gt;Riot API reference&lt;/a&gt; on Mon Jun 05 20:58:07 PDT 2017. */
+public class TeamStats implements Serializable {
+  public final boolean firstDragon;
+
+  public final boolean firstInhibitor;
+
+  public final List&lt;TeamBans&gt; bans;
+
+  public final int baronKills;
+
+  public final boolean firstRiftHerald;
+
+  public final boolean firstBaron;
+
+  public final int riftHeraldKills;
+
+  public final boolean firstBlood;
+
+  public final int teamId;
+
+  public final boolean firstTower;
+
+  public final int vilemawKills;
+
+  public final int inhibitorKills;
+
+  public final int towerKills;
+
+  public final int dominionVictoryScore;
+
+  public final String win;
+
+  public final int dragonKills;
+
+  public TeamStats(final boolean firstDragon, final boolean firstInhibitor,
+      final List&lt;TeamBans&gt; bans, final int baronKills, final boolean firstRiftHerald,
+      final boolean firstBaron, final int riftHeraldKills, final boolean firstBlood,
+      final int teamId, final boolean firstTower, final int vilemawKills, final int inhibitorKills,
+      final int towerKills, final int dominionVictoryScore, final String win,
+<span class="nc" id="L52">      final int dragonKills) {</span>
+<span class="nc" id="L53">    this.firstDragon = firstDragon;</span>
+<span class="nc" id="L54">    this.firstInhibitor = firstInhibitor;</span>
+<span class="nc" id="L55">    this.bans = bans;</span>
+<span class="nc" id="L56">    this.baronKills = baronKills;</span>
+<span class="nc" id="L57">    this.firstRiftHerald = firstRiftHerald;</span>
+<span class="nc" id="L58">    this.firstBaron = firstBaron;</span>
+<span class="nc" id="L59">    this.riftHeraldKills = riftHeraldKills;</span>
+<span class="nc" id="L60">    this.firstBlood = firstBlood;</span>
+<span class="nc" id="L61">    this.teamId = teamId;</span>
+<span class="nc" id="L62">    this.firstTower = firstTower;</span>
+<span class="nc" id="L63">    this.vilemawKills = vilemawKills;</span>
+<span class="nc" id="L64">    this.inhibitorKills = inhibitorKills;</span>
+<span class="nc" id="L65">    this.towerKills = towerKills;</span>
+<span class="nc" id="L66">    this.dominionVictoryScore = dominionVictoryScore;</span>
+<span class="nc" id="L67">    this.win = win;</span>
+<span class="nc" id="L68">    this.dragonKills = dragonKills;</span>
+<span class="nc" id="L69">  }</span>
+
+  @Override
+  public boolean equals(final Object obj) {
+<span class="nc bnc" id="L73" title="All 2 branches missed.">    if (obj == this) return true;</span>
+<span class="nc bnc" id="L74" title="All 2 branches missed.">    if (!(obj instanceof TeamStats)) return false;</span>
+<span class="nc" id="L75">    final TeamStats other = (TeamStats) obj;</span>
+<span class="nc" id="L76">    return true</span>
+<span class="nc bnc" id="L77" title="All 2 branches missed.">        &amp;&amp; Objects.equal(firstDragon, other.firstDragon)</span>
+<span class="nc bnc" id="L78" title="All 2 branches missed.">        &amp;&amp; Objects.equal(firstInhibitor, other.firstInhibitor)</span>
+<span class="nc bnc" id="L79" title="All 2 branches missed.">        &amp;&amp; Objects.equal(bans, other.bans)</span>
+<span class="nc bnc" id="L80" title="All 2 branches missed.">        &amp;&amp; Objects.equal(baronKills, other.baronKills)</span>
+<span class="nc bnc" id="L81" title="All 2 branches missed.">        &amp;&amp; Objects.equal(firstRiftHerald, other.firstRiftHerald)</span>
+<span class="nc bnc" id="L82" title="All 2 branches missed.">        &amp;&amp; Objects.equal(firstBaron, other.firstBaron)</span>
+<span class="nc bnc" id="L83" title="All 2 branches missed.">        &amp;&amp; Objects.equal(riftHeraldKills, other.riftHeraldKills)</span>
+<span class="nc bnc" id="L84" title="All 2 branches missed.">        &amp;&amp; Objects.equal(firstBlood, other.firstBlood)</span>
+<span class="nc bnc" id="L85" title="All 2 branches missed.">        &amp;&amp; Objects.equal(teamId, other.teamId)</span>
+<span class="nc bnc" id="L86" title="All 2 branches missed.">        &amp;&amp; Objects.equal(firstTower, other.firstTower)</span>
+<span class="nc bnc" id="L87" title="All 2 branches missed.">        &amp;&amp; Objects.equal(vilemawKills, other.vilemawKills)</span>
+<span class="nc bnc" id="L88" title="All 2 branches missed.">        &amp;&amp; Objects.equal(inhibitorKills, other.inhibitorKills)</span>
+<span class="nc bnc" id="L89" title="All 2 branches missed.">        &amp;&amp; Objects.equal(towerKills, other.towerKills)</span>
+<span class="nc bnc" id="L90" title="All 2 branches missed.">        &amp;&amp; Objects.equal(dominionVictoryScore, other.dominionVictoryScore)</span>
+<span class="nc bnc" id="L91" title="All 2 branches missed.">        &amp;&amp; Objects.equal(win, other.win)</span>
+<span class="nc bnc" id="L92" title="All 2 branches missed.">        &amp;&amp; Objects.equal(dragonKills, other.dragonKills);}</span>
+
+  @Override
+  public int hashCode() {
+<span class="nc" id="L96">    return Objects.hashCode(0,</span>
+<span class="nc" id="L97">        firstDragon,</span>
+<span class="nc" id="L98">        firstInhibitor,</span>
+        bans,
+<span class="nc" id="L100">        baronKills,</span>
+<span class="nc" id="L101">        firstRiftHerald,</span>
+<span class="nc" id="L102">        firstBaron,</span>
+<span class="nc" id="L103">        riftHeraldKills,</span>
+<span class="nc" id="L104">        firstBlood,</span>
+<span class="nc" id="L105">        teamId,</span>
+<span class="nc" id="L106">        firstTower,</span>
+<span class="nc" id="L107">        vilemawKills,</span>
+<span class="nc" id="L108">        inhibitorKills,</span>
+<span class="nc" id="L109">        towerKills,</span>
+<span class="nc" id="L110">        dominionVictoryScore,</span>
+        win,
+<span class="nc" id="L112">        dragonKills);}</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.7.9.201702052155</span></div></body></html>

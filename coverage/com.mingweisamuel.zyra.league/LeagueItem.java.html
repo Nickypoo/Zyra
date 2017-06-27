@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LeagueItem.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">zyra</a> &gt; <a href="index.source.html" class="el_package">com.mingweisamuel.zyra.league</a> &gt; <span class="el_source">LeagueItem.java</span></div><h1>LeagueItem.java</h1><pre class="source lang-java linenums">package com.mingweisamuel.zyra.league;
+
+import com.google.common.base.Objects;
+import java.io.Serializable;
+import java.lang.Object;
+import java.lang.Override;
+import java.lang.String;
+
+/**
+ * LeagueItem.&lt;br&gt;&lt;br&gt;
+ *
+ * This class was automatically generated from the &lt;a href=&quot;https://developer.riotgames.com/api-methods/#league-v3/GET_getChallengerLeague&quot;&gt;Riot API reference&lt;/a&gt; on Mon Jun 05 20:58:07 PDT 2017. */
+public class LeagueItem implements Serializable {
+  public final String rank;
+
+  public final boolean hotStreak;
+
+  public final MiniSeries miniSeries;
+
+  public final int wins;
+
+  public final boolean veteran;
+
+  public final int losses;
+
+  public final String playerOrTeamId;
+
+  public final String playerOrTeamName;
+
+  public final boolean inactive;
+
+  public final boolean freshBlood;
+
+  public final int leaguePoints;
+
+  public LeagueItem(final String rank, final boolean hotStreak, final MiniSeries miniSeries,
+      final int wins, final boolean veteran, final int losses, final String playerOrTeamId,
+      final String playerOrTeamName, final boolean inactive, final boolean freshBlood,
+<span class="nc" id="L39">      final int leaguePoints) {</span>
+<span class="nc" id="L40">    this.rank = rank;</span>
+<span class="nc" id="L41">    this.hotStreak = hotStreak;</span>
+<span class="nc" id="L42">    this.miniSeries = miniSeries;</span>
+<span class="nc" id="L43">    this.wins = wins;</span>
+<span class="nc" id="L44">    this.veteran = veteran;</span>
+<span class="nc" id="L45">    this.losses = losses;</span>
+<span class="nc" id="L46">    this.playerOrTeamId = playerOrTeamId;</span>
+<span class="nc" id="L47">    this.playerOrTeamName = playerOrTeamName;</span>
+<span class="nc" id="L48">    this.inactive = inactive;</span>
+<span class="nc" id="L49">    this.freshBlood = freshBlood;</span>
+<span class="nc" id="L50">    this.leaguePoints = leaguePoints;</span>
+<span class="nc" id="L51">  }</span>
+
+  @Override
+  public boolean equals(final Object obj) {
+<span class="nc bnc" id="L55" title="All 2 branches missed.">    if (obj == this) return true;</span>
+<span class="nc bnc" id="L56" title="All 2 branches missed.">    if (!(obj instanceof LeagueItem)) return false;</span>
+<span class="nc" id="L57">    final LeagueItem other = (LeagueItem) obj;</span>
+<span class="nc" id="L58">    return true</span>
+<span class="nc bnc" id="L59" title="All 2 branches missed.">        &amp;&amp; Objects.equal(rank, other.rank)</span>
+<span class="nc bnc" id="L60" title="All 2 branches missed.">        &amp;&amp; Objects.equal(hotStreak, other.hotStreak)</span>
+<span class="nc bnc" id="L61" title="All 2 branches missed.">        &amp;&amp; Objects.equal(miniSeries, other.miniSeries)</span>
+<span class="nc bnc" id="L62" title="All 2 branches missed.">        &amp;&amp; Objects.equal(wins, other.wins)</span>
+<span class="nc bnc" id="L63" title="All 2 branches missed.">        &amp;&amp; Objects.equal(veteran, other.veteran)</span>
+<span class="nc bnc" id="L64" title="All 2 branches missed.">        &amp;&amp; Objects.equal(losses, other.losses)</span>
+<span class="nc bnc" id="L65" title="All 2 branches missed.">        &amp;&amp; Objects.equal(playerOrTeamId, other.playerOrTeamId)</span>
+<span class="nc bnc" id="L66" title="All 2 branches missed.">        &amp;&amp; Objects.equal(playerOrTeamName, other.playerOrTeamName)</span>
+<span class="nc bnc" id="L67" title="All 2 branches missed.">        &amp;&amp; Objects.equal(inactive, other.inactive)</span>
+<span class="nc bnc" id="L68" title="All 2 branches missed.">        &amp;&amp; Objects.equal(freshBlood, other.freshBlood)</span>
+<span class="nc bnc" id="L69" title="All 2 branches missed.">        &amp;&amp; Objects.equal(leaguePoints, other.leaguePoints);}</span>
+
+  @Override
+  public int hashCode() {
+<span class="nc" id="L73">    return Objects.hashCode(0,</span>
+        rank,
+<span class="nc" id="L75">        hotStreak,</span>
+        miniSeries,
+<span class="nc" id="L77">        wins,</span>
+<span class="nc" id="L78">        veteran,</span>
+<span class="nc" id="L79">        losses,</span>
+        playerOrTeamId,
+        playerOrTeamName,
+<span class="nc" id="L82">        inactive,</span>
+<span class="nc" id="L83">        freshBlood,</span>
+<span class="nc" id="L84">        leaguePoints);}</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.7.9.201702052155</span></div></body></html>

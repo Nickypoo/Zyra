@@ -1,0 +1,220 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RateLimiter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">zyra</a> &gt; <a href="index.source.html" class="el_package">com.mingweisamuel.zyra.util</a> &gt; <span class="el_source">RateLimiter.java</span></div><h1>RateLimiter.java</h1><pre class="source lang-java linenums">package com.mingweisamuel.zyra.util;
+
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
+
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
+
+/**
+ * Rate limiter.
+ */
+public class RateLimiter {
+    /** A scheduler used to wait for async delays. */
+<span class="fc" id="L19">    private static final Lazy&lt;ScheduledExecutorService&gt; executor = new Lazy&lt;&gt;(</span>
+<span class="fc" id="L20">            () -&gt; new ScheduledThreadPoolExecutor(2, new ThreadFactoryBuilder().setDaemon(true).build()));</span>
+
+    /** Provides current date (Allows for fast debugging). */
+    private final DateTimeProvider dateTimeProvider;
+
+    /** Lock to prevent multiple threads from entering the block. */
+<span class="fc" id="L26">    private final Object lock = new Object();</span>
+
+    /** Readonly map of timespan to max requests. */
+    private final ConcurrentMap&lt;Long, Integer&gt; rateLimits;
+    /** Map of timespan to when the timespan started. */
+<span class="fc" id="L31">    private final ConcurrentMap&lt;Long, Long&gt; initialRequests = new ConcurrentHashMap&lt;&gt;();</span>
+    /** Map of timespan to the number of requests since the initial request. */
+<span class="fc" id="L33">    private final ConcurrentMap&lt;Long, Integer&gt; requestCounts = new ConcurrentHashMap&lt;&gt;();</span>
+
+    /** Retry after delay. */
+<span class="fc" id="L36">    private volatile long retryAfterTimestamp = 0;</span>
+
+    /** Number of milliseconds to retry after if the concurrent request limit is reached. */
+    public static final int CONCURRENT_REQUESTS_RETRY_INTERVAL = 20;
+    /** The default number of concurrent requests allowed. */
+    public static final int CONCURRENT_REQUESTS_DEFAULT_MAX = 2;
+    /** Default concurrent requests for production keys. */
+    public static final int CONCURRENT_REQUESTS_PRODUCTION_MAX = 25;
+    /** The semaphore for limiting the number of concurrent requests. */
+    private final Semaphore concurrentRequestSemaphore;
+
+    /**
+     * Creates a RateLimiter with the specified rate limits. DateTimeProvider defaults to System::currentTimeMillis.
+     * @param rateLimits A map where the keys represent time spans in milliseconds and the values represent the maximum
+     *                   number of requests allowed to pass through during the time span.
+     */
+    public RateLimiter(ConcurrentMap&lt;Long, Integer&gt; rateLimits) {
+<span class="fc" id="L53">        this(rateLimits, CONCURRENT_REQUESTS_DEFAULT_MAX);</span>
+<span class="fc" id="L54">    }</span>
+
+    /**
+     * Creates a RateLimiter with the specified rate limits. DateTimeProvider defaults to System::currentTimeMillis.
+     * @param rateLimits A map where the keys represent time spans in milliseconds and the values represent the maximum
+     *                   number of requests allowed to pass through during the time span.
+     * @param maxConcurrentRequests The maximum number of concurrent requests allowed.
+     */
+    public RateLimiter(ConcurrentMap&lt;Long, Integer&gt; rateLimits, int maxConcurrentRequests) {
+<span class="fc" id="L63">        this(rateLimits, maxConcurrentRequests, System::currentTimeMillis);</span>
+<span class="fc" id="L64">    }</span>
+
+    /** Creates a RateLimiter with the specified rate limits and dateTimeProvider.
+     * @param rateLimits A map where the keys represent time spans in milliseconds and the values represent the maximum
+     *                   number of requests allowed to pass through during the time span.
+     * @param concurrentRequestsMax The maximum number of concurrent requests allowed.
+     * @param dateTimeProvider A dateTimeProvider to provide the current time. Useful for debugging/unit testing.
+     */
+<span class="fc" id="L72">    public RateLimiter(ConcurrentMap&lt;Long, Integer&gt; rateLimits, int concurrentRequestsMax, DateTimeProvider dateTimeProvider) {</span>
+<span class="fc" id="L73">        this.rateLimits = rateLimits;</span>
+<span class="fc" id="L74">        this.concurrentRequestSemaphore = new Semaphore(concurrentRequestsMax);</span>
+<span class="fc" id="L75">        this.dateTimeProvider = dateTimeProvider;</span>
+<span class="fc" id="L76">    }</span>
+
+    /**
+     * @return A CompletableFuture that will complete when the request can continue.
+     */
+    public CompletableFuture&lt;Void&gt; acquireAsync() {
+<span class="fc" id="L82">        CompletableFuture&lt;Void&gt; result = new CompletableFuture&lt;&gt;();</span>
+<span class="fc" id="L83">        acquireAsyncInternal1(result);</span>
+<span class="fc" id="L84">        return result;</span>
+    }
+
+    /**
+     * Passes RESULT to acquireAsyncInternal2 when a lock has been acquired.
+     * @param result
+     */
+    private void acquireAsyncInternal1(CompletableFuture&lt;Void&gt; result) {
+<span class="fc bfc" id="L92" title="All 2 branches covered.">        if (concurrentRequestSemaphore.tryAcquire()) {</span>
+<span class="fc" id="L93">            acquireAsyncInternal2(result);</span>
+<span class="fc" id="L94">            return;</span>
+        }
+<span class="fc" id="L96">        executor.get().schedule(() -&gt; acquireAsyncInternal1(result),</span>
+                CONCURRENT_REQUESTS_RETRY_INTERVAL, TimeUnit.MILLISECONDS);
+<span class="fc" id="L98">    }</span>
+
+    /**
+     * Completes RESULT when the request can continue.
+     * @param result
+     */
+    private void acquireAsyncInternal2(CompletableFuture&lt;Void&gt; result) {
+        long delay;
+        // get lock so getDelay() and updateDelay() will be sequential.
+        // do not put any blocking or asynchronous operations inside of synchronized (lock)
+<span class="fc" id="L108">        synchronized (lock) {</span>
+<span class="fc" id="L109">            delay = getDelay();</span>
+<span class="fc bfc" id="L110" title="All 2 branches covered.">            if (delay &lt;= 0) {</span>
+<span class="fc" id="L111">                updateDelay();</span>
+<span class="fc" id="L112">                result.complete(null);</span>
+<span class="fc" id="L113">                return;</span>
+            }
+<span class="pc" id="L115">        }</span>
+<span class="fc" id="L116">        executor.get().schedule(() -&gt; acquireAsyncInternal2(result), delay, TimeUnit.MILLISECONDS);</span>
+<span class="fc" id="L117">    }</span>
+
+    /**
+     * Blocks until no rate limits will be violated.
+     * @throws InterruptedException If the thread was interrupted.
+     */
+    public void acquire() throws InterruptedException {
+        long delay;
+<span class="fc" id="L125">        concurrentRequestSemaphore.acquire();</span>
+<span class="fc bfc" id="L126" title="All 2 branches covered.">        while ((delay = getDelay()) &gt; 0) {</span>
+<span class="fc" id="L127">            Thread.sleep(delay);</span>
+        }
+<span class="fc" id="L129">        updateDelay();</span>
+<span class="fc" id="L130">    }</span>
+
+
+    /**
+     * Releases a lock obtained by acquire() or acquireAsync().
+     */
+    public void release() {
+<span class="fc" id="L137">        concurrentRequestSemaphore.release();</span>
+<span class="fc" id="L138">    }</span>
+
+    /**
+     * Sets the RateLimiter to block for the specified delay.
+     * @param delay Amount of time to block for.
+     */
+    public void setRetryAfter(long delay) {
+<span class="fc" id="L145">        synchronized (lock) {</span>
+<span class="fc" id="L146">            retryAfterTimestamp = dateTimeProvider.now() + delay;</span>
+<span class="pc" id="L147">        }</span>
+<span class="fc" id="L148">    }</span>
+
+    /**
+     * @return The minimum delay in milliseconds needed to respect rate limits.
+     */
+    private long getDelay() {
+<span class="fc" id="L154">        synchronized (lock) {</span>
+<span class="fc" id="L155">            long now = dateTimeProvider.now();</span>
+<span class="fc" id="L156">            long delay = 0;</span>
+
+            // update delay to match retryAfterTimestamp if applicable.
+<span class="fc" id="L159">            long retryDelay = retryAfterTimestamp - now;</span>
+<span class="fc bfc" id="L160" title="All 2 branches covered.">            if (retryDelay &gt; delay)</span>
+<span class="fc" id="L161">                delay = retryDelay;</span>
+
+<span class="fc bfc" id="L163" title="All 2 branches covered.">            for (Map.Entry&lt;Long, Integer&gt; requestCountPair : requestCounts.entrySet()) {</span>
+                // for each timespan rule.
+<span class="fc" id="L165">                long timespan = requestCountPair.getKey();</span>
+<span class="fc" id="L166">                int requestCount = requestCountPair.getValue();</span>
+<span class="fc" id="L167">                int limit = rateLimits.get(timespan);</span>
+
+                // if requestCount is at the limit, update the delay to match.
+<span class="fc bfc" id="L170" title="All 2 branches covered.">                if (requestCount &gt;= limit) {</span>
+                    // initialRequest should exist if requestCount exists.
+<span class="fc" id="L172">                    long initialRequest = initialRequests.get(timespan);</span>
+<span class="fc" id="L173">                    long newDelay = initialRequest + timespan - now;</span>
+<span class="fc bfc" id="L174" title="All 2 branches covered.">                    if (newDelay &gt; delay)</span>
+<span class="fc" id="L175">                        delay = newDelay;</span>
+                }
+<span class="fc" id="L177">            }</span>
+
+<span class="fc" id="L179">            return delay;</span>
+<span class="nc" id="L180">        }</span>
+    }
+
+    /**
+     * Updates the rate limit counters after getDelay() has been waited.
+     */
+    private void updateDelay() {
+<span class="fc" id="L187">        synchronized (lock) {</span>
+<span class="fc" id="L188">            long now = dateTimeProvider.now();</span>
+
+            // Operations on the ConcurrentHashMaps don't need to be atomic because only one thread can access the maps at
+            // a time because of the Semaphore lock.
+<span class="fc bfc" id="L192" title="All 2 branches covered.">            for (Map.Entry&lt;Long, Integer&gt; rateLimit : rateLimits.entrySet()) {</span>
+<span class="fc" id="L193">                long timespan = rateLimit.getKey();</span>
+
+<span class="fc" id="L195">                Long initialRequest = initialRequests.get(timespan);</span>
+<span class="fc" id="L196">                Integer requestCount = requestCounts.get(timespan);</span>
+
+<span class="pc bpc" id="L198" title="1 of 6 branches missed.">                if (requestCount == null || initialRequest == null || initialRequest &lt; now - timespan) {</span>
+<span class="fc" id="L199">                    requestCounts.put(timespan, 0);</span>
+<span class="fc" id="L200">                    initialRequests.put(timespan, now);</span>
+<span class="fc" id="L201">                    requestCount = 0;</span>
+                }
+
+<span class="fc" id="L204">                requestCounts.put(timespan, requestCount + 1);</span>
+<span class="fc" id="L205">            }</span>
+<span class="pc" id="L206">        }</span>
+<span class="fc" id="L207">    }</span>
+
+    /**
+     * Interface for getting the time. Useful to implement for debugging/unit testing.
+     */
+    @FunctionalInterface
+    interface DateTimeProvider {
+        /**
+         * @return The current time in milliseconds.
+         */
+        long now();
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.7.9.201702052155</span></div></body></html>

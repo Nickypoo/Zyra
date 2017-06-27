@@ -1,0 +1,360 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RiotApi.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">zyra</a> &gt; <a href="index.source.html" class="el_package">com.mingweisamuel.zyra</a> &gt; <span class="el_source">RiotApi.java</span></div><h1>RiotApi.java</h1><pre class="source lang-java linenums">package com.mingweisamuel.zyra;
+
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import com.google.gson.Gson;
+import com.mingweisamuel.zyra.enums.Region;
+import com.mingweisamuel.zyra.util.Lazy;
+import com.mingweisamuel.zyra.util.RateLimitedRequester;
+import com.mingweisamuel.zyra.util.RateLimiter;
+import org.asynchttpclient.AsyncHttpClient;
+import org.asynchttpclient.DefaultAsyncHttpClient;
+import org.asynchttpclient.DefaultAsyncHttpClientConfig;
+import org.asynchttpclient.Param;
+
+import java.io.Closeable;
+import java.io.IOException;
+import java.lang.reflect.Type;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+
+/**
+ * Riot API. The main class for interacting with the Riot API on a low level.&lt;br&gt;&lt;br&gt;
+ *
+ * The {@link com.mingweisamuel.zyra.entity.EntityApi} is simpler and more user-friendly to use.
+ */
+public class RiotApi implements Closeable {
+
+    /** Json parser. */
+<span class="fc" id="L32">    private final Gson gson = new Gson();</span>
+    /** Web requester. */
+    private final Lazy&lt;RateLimitedRequester&gt; requester;
+
+<span class="fc" id="L36">    public final ChampionEndpoints champions = new ChampionEndpoints(this);</span>
+<span class="fc" id="L37">    public final ChampionMasteryEndpoints championMasteries = new ChampionMasteryEndpoints(this);</span>
+<span class="fc" id="L38">    public final LeagueEndpoints leagues = new LeagueEndpoints(this);</span>
+<span class="fc" id="L39">    public final SpectatorEndpoints spectator = new SpectatorEndpoints(this);</span>
+<span class="fc" id="L40">    public final LolStaticDataEndpoints staticData = new LolStaticDataEndpoints(this);</span>
+<span class="fc" id="L41">    public final LolStatusEndpoints status = new LolStatusEndpoints(this);</span>
+<span class="fc" id="L42">    public final MasteriesEndpoints masteries = new MasteriesEndpoints(this);</span>
+<span class="fc" id="L43">    public final MatchEndpoints matches = new MatchEndpoints(this);</span>
+<span class="fc" id="L44">    public final RunesEndpoints runes = new RunesEndpoints(this);</span>
+<span class="fc" id="L45">    public final SummonerEndpoints summoners = new SummonerEndpoints(this);</span>
+
+
+    /**
+     * Creates a RiotApi.Builder with default development rate limits (10 requests per 10 seconds, 500 requests
+     * per 10 minutes).
+     *
+     * @param apiKey Development API key.
+     * @return Builder instance. Call {@link Builder#build()} to get RiotApi instance.
+     */
+    public static Builder builder(String apiKey) {
+<span class="fc" id="L56">        return new Builder(apiKey);</span>
+    }
+
+    /**
+     * Creates a RiotApi.Builder with default production rate limits (3,000 requests per 10 seconds, 180,000 requests
+     * per 10 minutes).
+     *
+     * @param apiKey Production API key.
+     * @return Builder instance. Call {@link Builder#build()} to get RiotApi instance.
+     */
+    public static Builder productionBuilder(String apiKey) {
+<span class="nc" id="L67">        return new Builder(apiKey).setDefaultRateLimits(true)</span>
+<span class="nc" id="L68">            .setConcurrentRequestsMax(RateLimiter.CONCURRENT_REQUESTS_PRODUCTION_MAX)</span>
+<span class="nc" id="L69">            .setTemporalResolutionFactor(10) // 3000 req/10 sec =&gt; 300 req/sec.</span>
+<span class="nc" id="L70">            .setRateLimitOverheadFactor(0.95f); // actually just 95% * 300 =&gt; 285 req/sec.</span>
+    }
+
+    /** Riot API builder for obtaining instances of the Riot API. */
+    public static class Builder {
+
+        /** Riot Games API key. */
+        private final String apiKey;
+
+        /** API rate limits. Key is time span in milliseconds, value is max number of requests allowed during that
+         * timespan. */
+<span class="fc" id="L81">        private Map&lt;Long, Integer&gt; rateLimits = new HashMap&lt;&gt;();</span>
+        {
+<span class="fc" id="L83">            rateLimits.put(RateLimitedRequester.TEN_SECONDS, 10);</span>
+<span class="fc" id="L84">            rateLimits.put(RateLimitedRequester.TEN_MINUTES, 500);</span>
+        }
+
+        /** The number of times to retry a request. */
+<span class="fc" id="L88">        private int retries = RateLimitedRequester.RETRIES_DEFAULT;</span>
+
+        /** The number of concurrent requests allowed (per-region). */
+<span class="fc" id="L91">        private int concurrentRequestsMax = RateLimiter.CONCURRENT_REQUESTS_DEFAULT_MAX;</span>
+
+        /** AsyncHttpClient to use. Null for default client. */
+<span class="fc" id="L94">        private AsyncHttpClient client = null;</span>
+
+        /** Multiplier of the rate limit to prevent excessive rate limit violations. */
+<span class="fc" id="L97">        private float rateLimitOverheadFactor = 1;</span>
+
+        /** Rate limit divisor for running concurrent API instances. */
+<span class="fc" id="L100">        private int concurrentInstances = 1;</span>
+
+        /**
+         * Multiplier of temporal resolution. If this has value 10, then a rate limit of 3000 req/10 sec
+         * will be treated as a rate limit of 300 req/sec.
+         */
+<span class="fc" id="L106">        private float temporalResolutionFactor = 1;</span>
+
+        /** Listener for HTTP responses. */
+<span class="fc" id="L109">        private ResponseListener responseListener = null;</span>
+
+
+        /**
+         * Creates a builder for a RiotApi instance with the specified API key.
+         *
+         * The rate limits default to the standard development api key rate limits. 10 requests every 10 seconds, 500
+         * requests every ten minutes.
+         *
+         * @param apiKey Riot Games API Key. Go &lt;a href=&quot;https://developer.riotgames.com/&quot;&gt;here&lt;/a&gt; to obtain a key.
+         */
+<span class="fc" id="L120">        private Builder(String apiKey) {</span>
+<span class="fc" id="L121">            this.apiKey = apiKey;</span>
+<span class="fc" id="L122">        }</span>
+
+        /**
+         * Builds the RiotApi instance. Returns a new instances every time this method is called.
+         * @return RiotApi instance.
+         */
+        public RiotApi build() {
+<span class="pc bpc" id="L129" title="1 of 2 branches missed.">            if (client == null) {</span>
+<span class="fc" id="L130">                client = new DefaultAsyncHttpClient(</span>
+<span class="fc" id="L131">                    new DefaultAsyncHttpClientConfig.Builder().setThreadFactory(</span>
+<span class="fc" id="L132">                        new ThreadFactoryBuilder().setDaemon(true).build()).build());</span>
+            }
+<span class="fc" id="L134">            Map&lt;Long, Integer&gt; calculatedRateLimits = new HashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L135" title="All 2 branches covered.">            for (Map.Entry&lt;Long, Integer&gt; rateLimit : rateLimits.entrySet()) {</span>
+<span class="fc" id="L136">                calculatedRateLimits.put((long) Math.ceil(rateLimit.getKey() / temporalResolutionFactor),</span>
+<span class="fc" id="L137">                    (int) Math.floor(rateLimitOverheadFactor * rateLimit.getValue() /</span>
+                        (temporalResolutionFactor * concurrentInstances)));
+<span class="fc" id="L139">            }</span>
+<span class="fc" id="L140">            return new RiotApi(apiKey, calculatedRateLimits, client, retries, concurrentRequestsMax, responseListener);</span>
+        }
+
+        /**
+         * Set arbitrary rate limits.
+         * @param rateLimits Map from long representing time span in milliseconds to int max requests per that time
+         *                   span.
+         * @return This, for chaining.
+         */
+        public Builder setRateLimits(Map&lt;Long, Integer&gt; rateLimits) {
+<span class="nc" id="L150">            this.rateLimits = rateLimits;</span>
+<span class="nc" id="L151">            return this;</span>
+        }
+
+        /**
+         * Sets max requests per 10 seconds and 10 minutes rate limits.
+         * @param rateLimitPer10Seconds Requests per 10 seconds.
+         * @param rateLimitPer10Minutes Requests per 10 minutes.
+         * @return This, for chaining.
+         */
+        public Builder setRateLimits(int rateLimitPer10Seconds, int rateLimitPer10Minutes) {
+<span class="nc" id="L161">            rateLimits = new HashMap&lt;&gt;();</span>
+<span class="nc" id="L162">            rateLimits.put(RateLimitedRequester.TEN_SECONDS, rateLimitPer10Seconds);</span>
+<span class="nc" id="L163">            rateLimits.put(RateLimitedRequester.TEN_MINUTES, rateLimitPer10Minutes);</span>
+<span class="nc" id="L164">            return this;</span>
+        }
+
+        /**
+         * Set the rate limits to either default development rate limits (10 requests per 10 seconds, 500 requests
+         * per 10 minutes) or default production rate limits (3,000 requests per 10 seconds, 180,000 requests per
+         * 10 minutes).
+         *
+         * @param production If true, set to default production rate limits. If false, set to default development
+         *                   rate limits.
+         * @return This, for chaining.
+         */
+        public Builder setDefaultRateLimits(boolean production) {
+<span class="nc" id="L177">            rateLimits = new HashMap&lt;&gt;();</span>
+<span class="nc bnc" id="L178" title="All 2 branches missed.">            if (production) {</span>
+<span class="nc" id="L179">                rateLimits.put(RateLimitedRequester.TEN_SECONDS, 3_000);</span>
+<span class="nc" id="L180">                rateLimits.put(RateLimitedRequester.TEN_MINUTES, 180_000);</span>
+            }
+            else {
+<span class="nc" id="L183">                rateLimits.put(RateLimitedRequester.TEN_SECONDS, 10);</span>
+<span class="nc" id="L184">                rateLimits.put(RateLimitedRequester.TEN_MINUTES, 500);</span>
+            }
+<span class="nc" id="L186">            return this;</span>
+        }
+
+        /**
+         * Set times to retry failed requests.
+         * @param retries
+         * @return This, for chaining.
+         */
+        public Builder setRetries(int retries) {
+<span class="fc" id="L195">            this.retries = retries;</span>
+<span class="fc" id="L196">            return this;</span>
+        }
+
+        /**
+         * Set the maximum number of concurrent requests allowed per region.
+         * @param concurrentRequestsMax
+         * @return This, for chaining.
+         */
+        public Builder setConcurrentRequestsMax(int concurrentRequestsMax) {
+<span class="fc" id="L205">            this.concurrentRequestsMax = concurrentRequestsMax;</span>
+<span class="fc" id="L206">            return this;</span>
+        }
+
+        /**
+         * Sets the AsyncHttpClient to use.
+         * @param client
+         * @return This, for chaining.
+         */
+        public Builder setClient(AsyncHttpClient client) {
+<span class="nc" id="L215">            this.client = client;</span>
+<span class="nc" id="L216">            return this;</span>
+        }
+
+        /**
+         * Sets a overhead factor for the rate limit. For example, if 0.9 is used, the API will limit requests rate
+         * to 90% of the full rate limit. This is to prevent accidental rate limit violations.
+         * @param rateLimitOverheadFactor Rate limit overhead factor (0.9 -&amp;gt; 90% of rate limit).
+         * @return This, for chaining.
+         */
+        public Builder setRateLimitOverheadFactor(float rateLimitOverheadFactor) {
+<span class="nc" id="L226">            this.rateLimitOverheadFactor = rateLimitOverheadFactor;</span>
+<span class="nc" id="L227">            return this;</span>
+        }
+
+        /**
+         * Sets a multiplier of temporal resolution. For example, if this has value 10, then a production rate limit of
+         * 3000 req/10 sec would be treated as a rate limit of 300 req/sec. This spreads out requests more and helps
+         * prevent accidental rate limit violations.
+         * @param temporalResolutionFactor Factor to multiply temporal resolution by. Should be greater than zero to
+         *     prevent violations (not enforced). Must be positive.
+         * @return This, for chaining.
+         */
+        public Builder setTemporalResolutionFactor(float temporalResolutionFactor) {
+<span class="nc bnc" id="L239" title="All 2 branches missed.">            if (temporalResolutionFactor &lt;= 0)</span>
+<span class="nc" id="L240">                throw new IllegalArgumentException(</span>
+                    &quot;Temporal resolution factor must be positive: &quot; + temporalResolutionFactor);
+<span class="nc" id="L242">            this.temporalResolutionFactor = temporalResolutionFactor;</span>
+<span class="nc" id="L243">            return this;</span>
+        }
+
+        /**
+         * Treats the created instance as one of many parallel instances and divides rate limits appropriately.
+         * @param instances Number of parallel instances.
+         * @return This, for chaining.
+         */
+        public Builder setConcurrentInstances(int instances) {
+<span class="nc bnc" id="L252" title="All 2 branches missed.">            if (instances &lt;= 0)</span>
+<span class="nc" id="L253">                throw new IllegalArgumentException(&quot;Instances must be greater than 0: &quot; + instances);</span>
+<span class="nc" id="L254">            this.concurrentInstances = instances;</span>
+<span class="nc" id="L255">            return this;</span>
+        }
+
+        /**
+         * Sets a response listener to listen to HTTP responses.
+         * @param responseListener A response listener. Set to {@code null} to clear response listener.
+         * @return This, for chaining.
+         * @deprecated TODO: This logic will change form in the near future.
+         */
+        @Deprecated
+        public Builder setResponseListener(ResponseListener responseListener) {
+<span class="nc" id="L266">            this.responseListener = responseListener;</span>
+<span class="nc" id="L267">            return this;</span>
+        }
+    }
+
+    /**
+     * Creates a RiotApi instance.
+     *
+     * @param apiKey Riot Games API key.
+     * @param rateLimits
+     * @param client AsyncHttpClient
+     * @param retries
+     * @param maxConcurrentRequests
+     */
+    private RiotApi(String apiKey, Map&lt;Long, Integer&gt; rateLimits, AsyncHttpClient client, int retries,
+<span class="fc" id="L281">            int maxConcurrentRequests, ResponseListener responseListener) {</span>
+<span class="fc" id="L282">        requester = new Lazy&lt;&gt;(() -&gt;</span>
+<span class="fc" id="L283">            new RateLimitedRequester(apiKey, rateLimits, client, retries, maxConcurrentRequests, responseListener));</span>
+<span class="fc" id="L284">    }</span>
+
+    /**
+     * Standardizes the supplied summoner name by removing whitespace and converting all uppercase letters to lowercase.
+     * @param name Summoner name.
+     * @return Standardized summoner name.
+     */
+    public static String standardizeName(String name) {
+<span class="fc" id="L292">        return name.replaceAll(&quot;\\s&quot;, &quot;&quot;).toLowerCase();</span>
+    }
+
+    @Override
+    public void close() throws IOException {
+<span class="nc" id="L297">        requester.get().close(); // May create the requester to immediately close it.</span>
+<span class="nc" id="L298">    }</span>
+
+    //region util
+    &lt;T&gt; T getBasic(String url, Region region, Type type, List&lt;Param&gt; params) {
+<span class="fc" id="L302">        return this.&lt;T&gt;getBasicAsync(url, region, type, params).join();</span>
+    }
+
+    &lt;T&gt; CompletableFuture&lt;T&gt; getBasicAsync(String url, Region region, Type type, List&lt;Param&gt; params) {
+<span class="fc" id="L306">        return requester.get().getRequestRateLimitedAsync(url, region, params)</span>
+<span class="fc bfc" id="L307" title="All 2 branches covered.">                .thenApply(r -&gt; r.getStatusCode() != 200 ? null :</span>
+<span class="fc" id="L308">                        gson.fromJson(r.getResponseBody(), type));</span>
+    }
+
+    &lt;T&gt; T getBasicNonRateLimited(String url, Region region, Type type, List&lt;Param&gt; params) {
+<span class="nc" id="L312">        return this.&lt;T&gt;getBasicNonRateLimitedAsync(url, region, type, params).join();</span>
+    }
+
+    &lt;T&gt; CompletableFuture&lt;T&gt; getBasicNonRateLimitedAsync(String url, Region region, Type type, List&lt;Param&gt; params) {
+<span class="nc" id="L316">        return requester.get().getRequestNonRateLimitedAsync(url, region, params)</span>
+<span class="nc bnc" id="L317" title="All 2 branches missed.">                .thenApply(r -&gt; r.getStatusCode() != 200 ? null :</span>
+<span class="nc" id="L318">                        gson.fromJson(r.getResponseBody(), type));</span>
+    }
+
+    &lt;T&gt; T getNonApi(String fullUrl, Type type, List&lt;Param&gt; params) {
+<span class="nc" id="L322">        return this.&lt;T&gt;getNonApiAsync(fullUrl, type, params).join();</span>
+    }
+
+    &lt;T&gt; CompletableFuture&lt;T&gt; getNonApiAsync(String fullUrl, Type type, List&lt;Param&gt; params) {
+<span class="nc" id="L326">        return requester.get().getRequestAsync(fullUrl, &quot;&quot;, params)</span>
+<span class="nc" id="L327">                .thenApply(r -&gt; gson.fromJson(r.getResponseBody(), type));</span>
+    }
+    //endregion
+
+    /**
+     * Creates params from each pair of elements. Must be an even number of elements. Key values must be non-null.
+     * @param paired
+     * @return
+     */
+    List&lt;Param&gt; makeParams(Object... paired) {
+
+<span class="fc" id="L338">        ArrayList&lt;Param&gt; result = new ArrayList&lt;&gt;(paired.length / 2);</span>
+<span class="fc bfc" id="L339" title="All 2 branches covered.">        for (int i = 0; i &lt; paired.length; i += 2) {</span>
+
+<span class="fc" id="L341">            Object key = paired[i];</span>
+<span class="pc bpc" id="L342" title="1 of 2 branches missed.">            if (key == null)</span>
+<span class="nc" id="L343">                throw new IllegalStateException(&quot;Cannot have null param key&quot;);</span>
+
+<span class="fc" id="L345">            Object value = paired[i + 1];</span>
+<span class="fc bfc" id="L346" title="All 2 branches covered.">            if (value == null)</span>
+<span class="fc" id="L347">                continue;</span>
+
+<span class="fc bfc" id="L349" title="All 2 branches covered.">            if (value instanceof Collection) {</span>
+<span class="fc bfc" id="L350" title="All 2 branches covered.">                for (Object v : ((Collection&lt;?&gt;) value))</span>
+<span class="fc" id="L351">                    result.add(new Param(key.toString(), v.toString()));</span>
+            }
+            else
+<span class="fc" id="L354">                result.add(new Param(key.toString(), value.toString()));</span>
+        }
+<span class="fc" id="L356">        return result;</span>
+    }
+    //endregion
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.7.9.201702052155</span></div></body></html>
