@@ -32,10 +32,10 @@ public class RateLimitedRequester extends Requester {
     private static final int[] STATUS_SUCCESS = {200, 204, 404, 422};
 
     /** Ten seconds in milliseconds. */
-    public static final long TEN_SECONDS = 10_000;
+    public static final long ONE_SECOND = 1000;
     /** Ten minutes in milliseconds. */
 
-    public static final long TEN_MINUTES = 600_000;
+    public static final long TEN_MINUTES = 120_000;
 
     /** Number of times to retry when the request fails, but can still be retried (429, 50*, etc.). */
     private final int retries;
